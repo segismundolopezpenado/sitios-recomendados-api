@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Site {
+  id         String   @id @default(cuid())
+  name       String
+  city       String
+  province   String
+  priceRange String
+  comments   String?
+  type       String
+  photos     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  mapsLink   String?
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  name        String
+  province    String?
+  distance    String?
+  routeType   String?
+  difficulty  String?
+  comments    String?
+  mapsLink    String?
+  wikilocLink String?
+  photos      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  elevation   String?
+  gpxLink     String?
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
