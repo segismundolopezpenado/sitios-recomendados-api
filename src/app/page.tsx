@@ -92,7 +92,7 @@ export default function Home() {
   const [sites, setSites] = useState<Site[]>([]);
   // Routes state - now with optional fields except name
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
@@ -216,6 +216,7 @@ export default function Home() {
           name: site.name, 
           photosCount: site.photos?.length || 0 
         })));
+        console.log("Actualizando estado de sites con", data.length, "sitios");
         setSites(data);
       } else {
         const errorText = await response.text();
@@ -245,6 +246,7 @@ export default function Home() {
           id: route.id, 
           name: route.name 
         })));
+        console.log("Actualizando estado de routes con", data.length, "rutas");
         setRoutes(data);
       } else {
         const errorText = await response.text();
@@ -274,8 +276,11 @@ export default function Home() {
 
   useEffect(() => {
     const loadData = async () => {
-      await Promise.all([loadSites(), loadRoutes()]);
-      setLoading(false);
+      try {
+        await Promise.all([loadSites(), loadRoutes()]);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
     };
     loadData();
   }, []);
