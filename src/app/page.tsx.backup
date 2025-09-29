@@ -1,0 +1,595 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Edit, Trash2, Plus, Search, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+interface Site {
+  id: string;
+  name: string;
+  city: string;
+  province: string;
+  priceRange: string;
+  comments: string;
+  type: "comer" | "dormir";
+  photos: string[];
+  mapsLink?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const provinces = [
+  "A Coruña",
+  "Lugo",
+  "Ourense",
+  "Pontevedra",
+  "Asturias",
+  "Cantabria",
+  "León",
+  "Madrid"
+];
+
+const priceRanges = [
+  "10-20€",
+  "15-30€",
+  "15-40€",
+  "20-30€",
+  "20-40€",
+  "20-50€",
+  "30-40€",
+  "30-50€",
+  "+50€"
+];
+
+export default function Home() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<"todos" | "comer" | "dormir">("todos");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingSite, setEditingSite] = useState<Site | null>(null);
+
+  // Cargar sitios desde la API
+  const loadSites = async () => {
+    try {
+      const response = await fetch("/api/sites");
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Sitios cargados:", data.map((site: any) => ({ 
+          id: site.id, 
+          name: site.name, 
+          photosCount: site.photos?.length || 0 
+        }))); // Debug
+        setSites(data);
+      } else {
+        toast.error("Error al cargar los sitios");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSites();
+  }, []);
+
+  const filteredSites = sites.filter(site => {
+    const matchesSearch = site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         site.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         site.province.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === "todos" || site.type === filterType;
+    return matchesSearch && matchesType;
+  });
+
+  const handleAddSite = async (siteData: Omit<Site, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.log("Enviando nuevo sitio:", {
+        ...siteData,
+        photos: siteData.photos.map(p => p.substring(0, 50) + "...")
+      }); // Debug
+      
+      const response = await fetch("/api/sites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(siteData),
+      });
+
+      if (response.ok) {
+        const newSite = await response.json();
+        console.log("Sitio recibido:", {
+          id: newSite.id,
+          photosCount: newSite.photos?.length || 0
+        }); // Debug
+        setSites(prev => [newSite, ...prev]);
+        setIsAddDialogOpen(false);
+        toast.success("Sitio añadido correctamente");
+      } else {
+        toast.error("Error al añadir el sitio");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const handleEditSite = async (siteData: Omit<Site, 'createdAt' | 'updatedAt'>) => {
+    if (!editingSite) return;
+
+    try {
+      console.log("Actualizando sitio:", {
+        id: editingSite.id,
+        ...siteData,
+        photos: siteData.photos.map(p => p.substring(0, 50) + "...")
+      }); // Debug
+
+      const response = await fetch(`/api/sites/${editingSite.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(siteData),
+      });
+
+      if (response.ok) {
+        const updatedSite = await response.json();
+        console.log("Sitio actualizado:", {
+          id: updatedSite.id,
+          photosCount: updatedSite.photos?.length || 0
+        }); // Debug
+        setSites(prev => prev.map(site => site.id === editingSite.id ? updatedSite : site));
+        setEditingSite(null);
+        toast.success("Sitio actualizado correctamente");
+      } else {
+        toast.error("Error al actualizar el sitio");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const handleDeleteSite = async (siteId: string) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este sitio?")) return;
+
+    try {
+      const response = await fetch(`/api/sites/${siteId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setSites(prev => prev.filter(site => site.id !== siteId));
+        toast.success("Sitio eliminado correctamente");
+      } else {
+        toast.error("Error al eliminar el sitio");
+      }
+    } catch (error) {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const handleViewOnMaps = (site: Site) => {
+    if (site.mapsLink) {
+      window.open(site.mapsLink, '_blank');
+    } else {
+      const query = `${site.name}, ${site.city}, ${site.province}`;
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white p-4 md:p-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl">Cargando sitios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 gap-6">
+          <div className="text-left">
+            <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent mb-4">
+              Sitios Recomendados
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-300 max-w-2xl">
+              Descubre y comparte tus lugares favoritos para comer y dormir
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <img 
+              src="https://z-cdn-media.chatglm.cn/files/52391950-8ad5-42a7-ad26-12fc365ccad5_seedream-4-2k_en_formato_16_9.jpeg?auth_key=1790589904-cc6598f8ad4c444c8af7843fda7ea680-0-49e2b927dda292646aa1b6f6653282d8" 
+              alt="Montañas y senderismo" 
+              className="w-48 h-32 md:w-64 md:h-48 object-cover rounded-2xl shadow-2xl border-2 border-white/20"
+            />
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-white/10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                placeholder="Buscar por nombre, ciudad o provincia..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 pl-10 h-12"
+              />
+            </div>
+            
+            <Select value={filterType} onValueChange={(value: "todos" | "comer" | "dormir") => setFilterType(value)}>
+              <SelectTrigger className="bg-white/10 border-white/20 text-white h-12">
+                <SelectValue placeholder="Tipo de sitio" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-900 border-white/20">
+                <SelectItem value="todos" className="text-white hover:bg-white/10">Todos</SelectItem>
+                <SelectItem value="comer" className="text-white hover:bg-white/10">Para comer</SelectItem>
+                <SelectItem value="dormir" className="text-white hover:bg-white/10">Para dormir</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 h-12 text-white font-semibold">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Añadir Sitio
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-gray-900 border-white/20 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+                    Añadir Nuevo Sitio
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-300">
+                    Completa los datos para recomendar un nuevo lugar
+                  </DialogDescription>
+                </DialogHeader>
+                <AddSiteForm onSubmit={handleAddSite} onCancel={() => setIsAddDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Sites Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSites.map((site) => (
+            <Card key={site.id} className="bg-gradient-to-br from-gray-800/80 via-purple-800/60 to-violet-800/80 backdrop-blur-sm border-purple-500/30 text-white hover:border-purple-400/50 transition-all duration-300 shadow-xl">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">
+                      {site.name}
+                    </CardTitle>
+                    <CardDescription className="text-gray-300">
+                      {site.city}, {site.province}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={site.type === "comer" ? "default" : "secondary"} 
+                         className={site.type === "comer" 
+                           ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                           : "bg-blue-500 hover:bg-blue-600 text-white"}>
+                    {site.type === "comer" ? "Para comer" : "Para dormir"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">Rango de precios</p>
+                    <Badge variant="outline" className="border-purple-500 text-purple-300 bg-purple-500/10">
+                      {site.priceRange}
+                    </Badge>
+                  </div>
+                  
+                  {site.comments && (
+                    <div>
+                      <p className="text-sm text-gray-400 mb-1">Comentarios</p>
+                      <p className="text-gray-300 text-sm">{site.comments}</p>
+                    </div>
+                  )}
+
+                  {site.photos.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-400 mb-2">Fotos ({site.photos.length})</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {site.photos.slice(0, 3).map((photo, index) => (
+                          <div key={index} className="aspect-square bg-gray-700/50 rounded-lg overflow-hidden border border-white/10">
+                            <img 
+                              src={photo} 
+                              alt={`Foto ${index + 1}`} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.log(`Error cargando imagen ${index + 1}:`, photo.substring(0, 100)); // Debug
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-xs text-gray-500">Foto ' + (index + 1) + '</div>';
+                                }
+                              }}
+                              onLoad={(e) => {
+                                console.log(`Imagen ${index + 1} cargada correctamente`); // Debug
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex-1" onClick={() => handleViewOnMaps(site)}>
+                      <MapPin className="mr-2 h-4 w-4" />
+                      Maps
+                    </Button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setEditingSite(site)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-gray-900 border-white/20 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+                            Editar Sitio
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-300">
+                            Modifica los datos del sitio
+                          </DialogDescription>
+                        </DialogHeader>
+                        {editingSite && (
+                          <AddSiteForm 
+                            initialData={editingSite} 
+                            onSubmit={handleEditSite} 
+                            onCancel={() => setEditingSite(null)} 
+                          />
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleDeleteSite(site.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {filteredSites.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-xl text-gray-400 mb-4">No se encontraron sitios</p>
+            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600">
+              <Plus className="mr-2 h-5 w-5" />
+              Añadir el primer sitio
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AddSiteFormProps {
+  initialData?: Site;
+  onSubmit: (siteData: Omit<Site, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onCancel: () => void;
+}
+
+function AddSiteForm({ initialData, onSubmit, onCancel }: AddSiteFormProps) {
+  const [formData, setFormData] = useState({
+    name: initialData?.name || "",
+    city: initialData?.city || "",
+    province: initialData?.province || "",
+    priceRange: initialData?.priceRange || "",
+    comments: initialData?.comments || "",
+    type: initialData?.type || "comer" as "comer" | "dormir",
+    photos: initialData?.photos || [],
+    mapsLink: initialData?.mapsLink || ""
+  });
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          console.log("Foto cargada:", result.substring(0, 50) + "..."); // Debug
+          setFormData(prev => ({
+            ...prev,
+            photos: [...prev.photos.slice(0, 2), result] // Máximo 3 fotos
+          }));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Enviando formulario:", {
+      ...formData,
+      photos: formData.photos.map(p => p.substring(0, 50) + "...")
+    }); // Debug
+    onSubmit(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="name" className="text-white">Nombre del sitio</Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({...formData, name: e.target.value})}
+          className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+          placeholder="Nombre del restaurante, hotel, etc."
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="city" className="text-white">Ciudad</Label>
+          <Input
+            id="city"
+            value={formData.city}
+            onChange={(e) => setFormData({...formData, city: e.target.value})}
+            className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+            placeholder="Ciudad"
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="province" className="text-white">Provincia</Label>
+          <Select value={formData.province} onValueChange={(value) => setFormData({...formData, province: value})}>
+            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectValue placeholder="Selecciona provincia" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-white/20">
+              {provinces.map((province) => (
+                <SelectItem key={province} value={province} className="text-white hover:bg-white/10">
+                  {province}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="priceRange" className="text-white">Rango de precios</Label>
+          <Select value={formData.priceRange} onValueChange={(value) => setFormData({...formData, priceRange: value})}>
+            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectValue placeholder="Selecciona precio" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-white/20">
+              {priceRanges.map((price) => (
+                <SelectItem key={price} value={price} className="text-white hover:bg-white/10">
+                  {price}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="type" className="text-white">Tipo de sitio</Label>
+          <Select value={formData.type} onValueChange={(value: "comer" | "dormir") => setFormData({...formData, type: value})}>
+            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-white/20">
+              <SelectItem value="comer" className="text-white hover:bg-white/10">Para comer</SelectItem>
+              <SelectItem value="dormir" className="text-white hover:bg-white/10">Para dormir</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="mapsLink" className="text-white">Enlace a Google Maps (opcional)</Label>
+        <Input
+          id="mapsLink"
+          value={formData.mapsLink}
+          onChange={(e) => setFormData({...formData, mapsLink: e.target.value})}
+          className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+          placeholder="https://maps.google.com/..."
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="comments" className="text-white">Comentarios</Label>
+        <Textarea
+          id="comments"
+          value={formData.comments}
+          onChange={(e) => setFormData({...formData, comments: e.target.value})}
+          className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+          placeholder="Añade tus comentarios sobre este lugar..."
+          rows={3}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="photos" className="text-white">Fotos</Label>
+        <div className="space-y-3">
+          {/* Botón para subir fotos */}
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Subir Fotos
+            </Button>
+            <input
+              id="file-upload"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <span className="text-sm text-gray-400">
+              {formData.photos.length}/3 fotos
+            </span>
+          </div>
+
+          {/* Vista previa de fotos */}
+          {formData.photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {formData.photos.map((photo, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={photo}
+                    alt={`Foto ${index + 1}`}
+                    className="w-full h-20 object-cover rounded-lg border border-white/20"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 border-red-500 text-white hover:bg-red-600"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      photos: prev.photos.filter((_, i) => i !== index)
+                    }))}
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="pt-4">
+        <Button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600">
+          {initialData ? "Actualizar Sitio" : "Guardar Sitio"}
+        </Button>
+      </div>
+    </form>
+  );
+}
