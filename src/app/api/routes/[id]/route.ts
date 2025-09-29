@@ -12,6 +12,29 @@ export async function PUT(
 
     console.log("Actualizando ruta:", { id, name, photosCount: photos?.length }); // Debug
 
+    // Try to add missing columns if they don't exist
+    try {
+      await db.$executeRaw`ALTER TABLE Route ADD COLUMN elevation TEXT`;
+      console.log("Elevation column added successfully");
+    } catch (error: any) {
+      if (error.message?.includes('duplicate column name') || error.code === 'SQLITE_ERROR') {
+        console.log("Elevation column already exists");
+      } else {
+        console.log("Error adding elevation column:", error.message);
+      }
+    }
+
+    try {
+      await db.$executeRaw`ALTER TABLE Route ADD COLUMN gpxLink TEXT`;
+      console.log("gpxLink column added successfully");
+    } catch (error: any) {
+      if (error.message?.includes('duplicate column name') || error.code === 'SQLITE_ERROR') {
+        console.log("gpxLink column already exists");
+      } else {
+        console.log("Error adding gpxLink column:", error.message);
+      }
+    }
+
     // Convertir array de fotos a string separado por |||
     const photosString = photos && photos.length > 0 ? photos.join("|||") : null;
 

@@ -81,7 +81,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error de conexión a la base de datos' }, { status: 500 });
     }
 
-    console.log("Conexión a la base de datos OK, creando ruta...");
+    console.log("Conexión a la base de datos OK, verificando/actualizando schema...");
+
+    // Try to add missing columns if they don't exist
+    try {
+      await db.$executeRaw`ALTER TABLE Route ADD COLUMN elevation TEXT`;
+      console.log("Elevation column added successfully");
+    } catch (error: any) {
+      if (error.message?.includes('duplicate column name') || error.code === 'SQLITE_ERROR') {
+        console.log("Elevation column already exists");
+      } else {
+        console.log("Error adding elevation column:", error.message);
+      }
+    }
+
+    try {
+      await db.$executeRaw`ALTER TABLE Route ADD COLUMN gpxLink TEXT`;
+      console.log("gpxLink column added successfully");
+    } catch (error: any) {
+      if (error.message?.includes('duplicate column name') || error.code === 'SQLITE_ERROR') {
+        console.log("gpxLink column already exists");
+      } else {
+        console.log("Error adding gpxLink column:", error.message);
+      }
+    }
+
+    console.log("Schema verificado/actualizado, creando ruta...");
 
     const route = await db.route.create({
       data: {
