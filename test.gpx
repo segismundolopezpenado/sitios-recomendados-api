@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test GPX">
+  <trk>
+    <name>Test Route</name>
+    <trkseg>
+      <trkpt lat="43.3623" lat="-8.4115"></trkpt>
+      <trkpt lat="43.3624" lat="-8.4116"></trkpt>
+      <trkpt lat="43.3625" lat="-8.4117"></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
