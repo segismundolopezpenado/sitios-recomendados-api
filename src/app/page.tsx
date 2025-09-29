@@ -147,6 +147,7 @@ export default function Home() {
             method: "DELETE",
           });
           console.log("Delete site response:", { status: response.status, ok: response.ok });
+          
           if (response.ok) {
             setSites(prev => prev.filter(site => site.id !== id));
             toast.success("Sitio eliminado correctamente");
@@ -157,7 +158,15 @@ export default function Home() {
           } else {
             const errorText = await response.text();
             console.error("Error response:", errorText);
-            toast.error("Error al eliminar el sitio");
+            
+            // Proporcionar mensajes de error más específicos
+            if (response.status === 404) {
+              toast.error("El sitio no existe o ya fue eliminado");
+            } else if (response.status === 500) {
+              toast.error("Error del servidor al eliminar el sitio");
+            } else {
+              toast.error(`Error al eliminar el sitio: ${errorText}`);
+            }
           }
           break;
 
@@ -167,6 +176,7 @@ export default function Home() {
             method: "DELETE",
           });
           console.log("Delete route response:", { status: response.status, ok: response.ok });
+          
           if (response.ok) {
             setRoutes(prev => prev.filter(route => route.id !== id));
             toast.success("Ruta eliminada correctamente");
@@ -177,13 +187,20 @@ export default function Home() {
           } else {
             const errorText = await response.text();
             console.error("Error response:", errorText);
-            toast.error("Error al eliminar la ruta");
+            
+            if (response.status === 404) {
+              toast.error("La ruta no existe o ya fue eliminada");
+            } else if (response.status === 500) {
+              toast.error("Error del servidor al eliminar la ruta");
+            } else {
+              toast.error(`Error al eliminar la ruta: ${errorText}`);
+            }
           }
           break;
       }
     } catch (error) {
       console.error("Error in delete operation:", error);
-      toast.error("Error de conexión");
+      toast.error("Error de conexión al intentar eliminar");
     } finally {
       console.log("Finally block - closing dialog");
       // Siempre cerrar el diálogo y limpiar después de intentar eliminar
@@ -260,6 +277,52 @@ export default function Home() {
   };
 
 
+
+  // Función para depurar sitios
+  const debugSites = async () => {
+    try {
+      const response = await fetch("/api/debug-sites");
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Debug sites info:", data);
+        alert(`Total sitios: ${data.totalSites}\nDuplicados: ${data.duplicates.length}\n\nRevisa la consola para más detalles.`);
+      } else {
+        alert("Error al obtener información de depuración");
+      }
+    } catch (error) {
+      console.error("Error debugging sites:", error);
+      alert("Error de conexión");
+    }
+  };
+
+  // Función para eliminar duplicados
+  const removeDuplicates = async () => {
+    const password = prompt("Introduce la contraseña para eliminar duplicados:");
+    if (!password) return;
+
+    try {
+      const response = await fetch("/api/remove-duplicates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Duplicados eliminados: ${data.deletedCount}\nGrupos duplicados encontrados: ${data.duplicateGroupsFound}`);
+        // Refrescar datos después de eliminar duplicados
+        refreshData();
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("Error removing duplicates:", error);
+      alert("Error de conexión");
+    }
+  };
 
   // Función para refrescar todos los datos
   const refreshData = async () => {
@@ -563,20 +626,40 @@ export default function Home() {
           {/* Contadores */}
           <div className="min-w-[200px]">
             <div className="flex justify-between items-center mb-3">
-              <button
-                onClick={refreshData}
-                disabled={refreshing}
-                className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-                title="Refrescar datos"
-              >
-                {refreshing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={refreshData}
+                  disabled={refreshing}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                  title="Refrescar datos"
+                >
+                  {refreshing ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={debugSites}
+                  className="text-gray-400 hover:text-yellow-400 transition-colors"
+                  title="Depurar sitios (ver duplicados)"
+                >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                )}
-              </button>
+                </button>
+                <button
+                  onClick={removeDuplicates}
+                  className="text-gray-400 hover:text-red-400 transition-colors"
+                  title="Eliminar duplicados"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -691,6 +774,9 @@ export default function Home() {
                     <CardDescription className="text-gray-300">
                       {site.city}, {site.province}
                     </CardDescription>
+                    <div className="text-xs text-gray-400 mt-1">
+                      ID: {site.id.substring(0, 8)}...
+                    </div>
                   </div>
                   <Badge variant={site.type === "comer" ? "default" : "secondary"} 
                          className={site.type === "comer" 
